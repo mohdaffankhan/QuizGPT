@@ -1,39 +1,63 @@
 import { GoogleGenAI, Type } from "@google/genai";
+import { auth } from "@clerk/nextjs/server";
 
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 export async function POST(req: Request) {
-  const { topic, level } = await req.json();
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
-  const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
-    contents: `Generate a list of questions of level ${level} on the topic of ${topic} for a quiz. The questions should be multiple choices and include the correct answer.`,
-    config: {
-      systemInstruction:
-        "You are a quiz generator. You will be given a topic and a difficulty level (from 1 to 5, where 5 is the most difficult).Based on the topic and difficulty level:Generate a multiple-choice quiz on the topic.For difficulty levels 1 to 3, generate 10 questions.For difficulty level 4, generate 15 questions.For difficulty level 5, generate 20 questions.Each question must:Be clearly phrased and relevant to the topic.Have 4 answer choices.Include the correct answer. The questions should be in a JSON format with the following structure: [{ question: 'What is the capital of France?', choices: ['Berlin', 'Madrid', 'Paris', 'Rome'], answer: 'Paris' }]",
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.ARRAY,
-        items: {
-          type: Type.OBJECT,
-          properties: {
-            question: {
-              type: Type.STRING,
-            },
-            choices: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.STRING,
-              },
-            },
-            answer: {
-              type: Type.STRING,
-            },
-          },
-          propertyOrdering: ["question", "choices", "answer"],
-        },
-      },
-    },
-  });
-
-  return new Response(response.text);
+ try {
+   const { userId } = await auth();
+   const freeUsed = req.headers.get("x-free-used");
+   if (!userId && freeUsed === "true") {
+     return new Response("You've used your free quiz. Sign in to generate more.");
+   }
+ 
+   const { topic, level } = await req.json();
+ 
+   const response = await ai.models.generateContent({
+     model: "gemini-2.5-flash",
+     contents: `Topic: ${topic}\nLevel: ${level}`,
+     config: {
+       systemInstruction: `
+       You are a quiz generator.
+       Input: a topic and a difficulty level from 1 to 5.
+       Output:
+         - For level 1-3: 10 questions.
+         - For level 4: 15 questions.
+         - For level 5: 20 questions.
+       For each:
+         - Multiple-choice (4 options).
+         - Provide the correct answer.
+         - JSON format: [{ question: "...", choices: ["A", "B", "C", "D"], answer: "..." }]
+         - Questions should be relevant, clearly phrased, and of the specified difficulty.
+     `,
+       responseMimeType: "application/json",
+       responseSchema: {
+         type: Type.ARRAY,
+         items: {
+           type: Type.OBJECT,
+           properties: {
+             question: {
+               type: Type.STRING,
+             },
+             choices: {
+               type: Type.ARRAY,
+               items: {
+                 type: Type.STRING,
+               },
+             },
+             answer: {
+               type: Type.STRING,
+             },
+           },
+           propertyOrdering: ["question", "choices", "answer"],
+         },
+       },
+     },
+   });
+ 
+   return new Response(response.text);
+ } catch (err:any) {
+  return new Response(
+      JSON.stringify({ error: err?.message || "AI generation failed" }),
+      { status: 500 }
+ )}
 }

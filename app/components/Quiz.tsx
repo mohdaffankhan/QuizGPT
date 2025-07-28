@@ -1,18 +1,20 @@
 "use client";
 
-import { useState } from "react";
-import { CheckCircle, XCircle } from "lucide-react";
+import { useState, useCallback } from "react";
+import {
+  CheckCircle,
+  XCircle,
+  Trophy,
+  ArrowRight,
+} from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
-import { useUser } from "@clerk/nextjs";
-type Question = {
-  question: string;
-  choices: string[];
-  answer: string;
-};
+import { SignedIn, SignedOut, SignInButton, SignUpButton, UserButton, useUser } from "@clerk/nextjs";
+import Image from "next/image";
+
+type Question = { question: string; choices: string[]; answer: string };
 
 export default function Quiz() {
   const { isSignedIn } = useUser();
-
   const [score, setScore] = useState(0);
   const [current, setCurrent] = useState(0);
   const [start, setStart] = useState(false);
@@ -23,215 +25,346 @@ export default function Quiz() {
   const [loading, setLoading] = useState(false);
   const [level, setLevel] = useState(3);
 
-  const hasUsedFree = () => {
-    return localStorage.getItem("freeUsed") === "true";
-  };
+  const hasUsedFree = useCallback(
+    () => localStorage.getItem("freeUsed") === "true",
+    []
+  );
 
-  const startQuiz = async () => {
+  const startQuiz = useCallback(async () => {
     if (!topic.trim()) return;
-
     if (!isSignedIn && hasUsedFree()) {
       alert("You've used your free quiz. Sign in to generate more.");
       return;
     }
-
     setLoading(true);
-
-    const res = await fetch("/api/quiz", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(isSignedIn ? {} : { "x-free-used": hasUsedFree().toString() }),
-      },
-      body: JSON.stringify({ topic, level }),
-    });
-
-    if (!res.ok) {
-      const errText = await res.text();
-      alert(errText || "Something went wrong.");
+    try {
+      const res = await fetch("/api/quiz", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(isSignedIn ? {} : { "x-free-used": hasUsedFree().toString() }),
+        },
+        body: JSON.stringify({ topic, level }),
+      });
+      if (!res.ok) {
+        const err = await res.text();
+        alert(err || "Something went wrong.");
+        setLoading(false);
+        return;
+      }
+      const data: Question[] = await res.json();
+      setQuestions(data);
+      setStart(true);
+      setShowScore(false);
+      setScore(0);
+      setCurrent(0);
+      setSelected(null);
+    } catch {
+      alert("Error generating quiz. Please try again.");
+    } finally {
       setLoading(false);
-      return;
     }
+    if (!isSignedIn) localStorage.setItem("freeUsed", "true");
+  }, [topic, level, isSignedIn, hasUsedFree]);
 
-    const data = await res.json();
-    setQuestions(data);
-    setStart(true);
-    setLoading(false);
-
-    if (!isSignedIn) {
-      localStorage.setItem("freeUsed", "true");
-    }
-  };
-
-  const restartQuiz = () => {
+  const restartQuiz = useCallback(() => {
     setScore(0);
     setCurrent(0);
     setStart(false);
     setShowScore(false);
     setSelected(null);
-    setTopic("");
     setQuestions([]);
-  };
+  }, []);
 
-  const handleAnswer = (choice: string) => {
-    setSelected(choice);
-    if (choice === questions[current].answer) setScore((s) => s + 1);
-
-    setTimeout(() => {
-      if (current + 1 < questions.length) {
-        setCurrent((prev) => prev + 1);
-        setSelected(null);
-      } else {
-        setShowScore(true);
-      }
-    }, 1000);
-  };
+  const handleAnswer = useCallback(
+    (choice: string) => {
+      if (selected) return;
+      setSelected(choice);
+      if (choice === questions[current].answer) setScore((s) => s + 1);
+      setTimeout(() => {
+        if (current + 1 < questions.length) {
+          setCurrent((prev) => prev + 1);
+          setSelected(null);
+        } else {
+          setShowScore(true);
+        }
+      }, 800); // Slightly longer delay for smoother transition
+    },
+    [questions, current, selected]
+  );
 
   const currentQ = questions[current];
 
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 text-white flex flex-col items-center px-4 py-6">
-      <div className="w-full max-w-2xl backdrop-blur-xl bg-slate-800/60 border border-slate-600/30 rounded-2xl shadow-2xl p-6 sm:p-10">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-2xl sm:text-3xl font-semibold text-indigo-200">
-            AI Quiz Generator
-          </h1>
-        </div>
+    <div>
+      {/* Auth buttons in top right corner */}
+      <div className="absolute top-4 right-4 z-50">
+        <SignedOut>
+          <div className="flex items-center gap-3">
+            <SignInButton>
+              <button className="text-gray-300 hover:text-white font-medium rounded-lg px-4 py-2 transition hover:bg-gray-800">
+                Sign In
+              </button>
+            </SignInButton>
+            <SignUpButton>
+              <button className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium text-sm sm:text-base h-10 px-5 cursor-pointer transition shadow-lg hover:shadow-indigo-500/20">
+                Get Started
+              </button>
+            </SignUpButton>
+          </div>
+        </SignedOut>
+        <SignedIn>
+          <UserButton appearance={{
+            elements: {
+              userButtonAvatarBox: "w-9 h-9",
+              userButtonPopoverCard: "bg-gray-800 border-gray-700",
+              userButtonPopoverActionButtonText: "text-gray-200",
+              userButtonPopoverActionButton: "hover:bg-gray-700",
+              userButtonPopoverFooter: "bg-gray-800"
+            }
+          }} />
+        </SignedIn>
+      </div>
 
-        {/* Start Screen */}
+      <div className="flex flex-col items-center justify-center w-full px-4 py-10">
+        <motion.div
+          initial={{ scale: 0.96, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ type: "spring", damping: 20 }}
+          className="w-full max-w-2xl bg-gray-800/80 backdrop-blur-sm border border-gray-700 rounded-2xl shadow-2xl p-6 md:p-8"
+        >
+        {/* Start Form */}
         {!start && !loading && (
-          <form
+          <motion.form
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
             onSubmit={(e) => {
               e.preventDefault();
               startQuiz();
             }}
+            className="flex flex-col gap-6"
           >
-            <input
-              className="w-full px-4 py-3 rounded-lg border border-slate-500 mb-4 bg-slate-700/40 placeholder:text-slate-400 text-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
-              placeholder="Enter a topic (e.g., JavaScript)"
-              value={topic}
-              onChange={(e) => setTopic(e.target.value)}
-            />
+            <div className="flex flex-col items-center mb-4">
+              <div>
+                <Image src="/logo.png" alt="Logo" width={175} height={100} className="rounded-lg" />
+              </div>
+              <p className="text-gray-400 text-center max-w-md">
+                Generate custom quizzes on any topic in seconds
+              </p>
+            </div>
 
-            {/* Difficulty Level Dropdown */}
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-slate-300 mb-1">
-                Difficulty Level
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-gray-300">Topic</label>
+              <input
+                type="text"
+                className="w-full rounded-lg bg-gray-700/50 border border-gray-600 px-5 py-3.5 text-base text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition font-medium"
+                placeholder="e.g., Quantum Physics, French Revolution..."
+                value={topic}
+                onChange={(e) => setTopic(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-gray-300">
+                Difficulty
               </label>
               <select
                 value={level}
-                onChange={(e) => setLevel(parseInt(e.target.value))}
-                className="w-full px-4 py-2 rounded-lg border border-slate-500 bg-slate-700/40 text-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                onChange={(e) => setLevel(Number(e.target.value))}
+                className="w-full rounded-lg bg-slate-800 border border-gray-600 px-4 py-3 text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition appearance-none"
               >
-                <option value={1}>1 - Beginner</option>
-                <option value={2}>2 - Easy</option>
-                <option value={3}>3 - Intermediate</option>
-                <option value={4}>4 - Hard</option>
-                <option value={5}>5 - Expert</option>
+                <option value={1}>Beginner</option>
+                <option value={2}>Easy</option>
+                <option value={3}>Intermediate</option>
+                <option value={4}>Hard</option>
+                <option value={5}>Expert</option>
               </select>
             </div>
 
-            <button
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
               type="submit"
-              className="w-full bg-indigo-500 hover:bg-indigo-600 transition-all duration-200 px-4 py-3 rounded-lg font-medium text-white text-lg"
+              className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-semibold rounded-xl py-3.5 text-lg shadow-lg hover:shadow-indigo-500/50 transition-all duration-300 ease-in-out flex items-center justify-center gap-2"
             >
-              Generate Quiz
-            </button>
-          </form>
+              Generate Quiz 
+              <motion.span
+                initial={{ x: -5 }}
+                animate={{ x: 0 }}
+                transition={{ repeat: Infinity, repeatType: "reverse", duration: 0.8 }}
+              >
+                <ArrowRight className="w-5 h-5" />
+              </motion.span>
+            </motion.button>
+          </motion.form>
         )}
 
-        {/* Loading */}
+        {/* Loading State */}
         {loading && (
-          <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-indigo-400 mx-auto mb-6" />
-            <p className="text-base text-slate-300">
-              Generating quiz on{" "}
-              <span className="text-indigo-200">{topic}</span>...
-            </p>
-          </div>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="flex flex-col items-center justify-center py-12"
+          >
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ repeat: Infinity, duration: 1.2, ease: "linear" }}
+              className="h-10 w-10 border-3 border-indigo-500 border-t-transparent rounded-full"
+            />
+            <motion.p
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              className="mt-6 text-gray-400 font-medium text-center"
+            >
+              Crafting your <span className="text-indigo-300">{topic}</span>{" "}
+              quiz...
+              <br />
+              <span className="text-sm text-gray-500">Powered by AI</span>
+            </motion.p>
+          </motion.div>
         )}
 
-        {/* Quiz in Progress */}
-        {start && !showScore && !loading && (
+        {/* Quiz In Progress */}
+        {start && !showScore && !loading && currentQ && (
           <AnimatePresence mode="wait">
-            <motion.div
+            <motion.section
               key={current}
-              initial={{ opacity: 0, x: 50 }}
+              initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -50 }}
-              transition={{ duration: 0.4 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ type: "spring", stiffness: 300, damping: 30 }}
+              className="space-y-6"
             >
-              <h2 className="text-xl font-semibold mb-6 text-indigo-200">
+              <div className="flex justify-between items-center">
+                <div className="text-sm font-medium text-indigo-400">
+                  Question {current + 1} of {questions.length}
+                </div>
+                <div className="text-sm font-medium text-gray-400">
+                  Score: {score}
+                </div>
+              </div>
+
+              <div className="h-1.5 w-full bg-gray-700 rounded-full overflow-hidden">
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{
+                    width: `${((current + 1) / questions.length) * 100}%`,
+                  }}
+                  transition={{ duration: 0.6 }}
+                  className="h-full bg-gradient-to-r from-indigo-500 to-purple-500"
+                />
+              </div>
+
+              <h2 className="text-xl font-bold text-gray-100 leading-snug">
                 {currentQ.question}
               </h2>
-              <div className="grid gap-4">
-                {currentQ.choices.map((choice) => {
+
+              <div className="space-y-3">
+                {currentQ.choices.map((choice, idx) => {
                   const isCorrect = choice === currentQ.answer;
                   const isWrong = selected === choice && !isCorrect;
+                  const isSelected = selected === choice;
+                  const isDisabled = !!selected;
+
+                  let buttonClass =
+                    "bg-gray-700/70 hover:bg-gray-700 text-gray-100";
+                  if (selected) {
+                    if (isCorrect) {
+                      buttonClass = "bg-green-600/90 text-white";
+                    } else if (isWrong) {
+                      buttonClass = "bg-red-600/90 text-white";
+                    } else {
+                      buttonClass = "bg-gray-800/50 text-gray-500";
+                    }
+                  }
 
                   return (
-                    <button
-                      key={choice}
+                    <motion.button
+                      key={`${current}-${idx}`}
+                      disabled={isDisabled}
                       onClick={() => handleAnswer(choice)}
-                      disabled={!!selected}
-                      className={`w-full flex items-center justify-between px-5 py-3 text-left rounded-xl border text-base font-medium transition-all duration-200
-                        ${
-                          selected
-                            ? isCorrect
-                              ? "bg-emerald-400/10 border-emerald-300/40 text-emerald-300"
-                              : isWrong
-                              ? "bg-rose-400/10 border-rose-300/40 text-rose-300"
-                              : "bg-slate-700/30 border-slate-600 text-slate-400 opacity-60"
-                            : "bg-slate-700/40 hover:bg-slate-600/40 hover:border-indigo-300 hover:text-indigo-200 border-slate-600 text-slate-200"
-                        }`}
+                      whileHover={!isDisabled ? { scale: 1.02 } : {}}
+                      whileTap={!isDisabled ? { scale: 0.98 } : {}}
+                      className={`w-full text-left rounded-xl px-5 py-3.5 font-medium transition-all flex items-center justify-between ${buttonClass}`}
                     >
                       <span>{choice}</span>
-                      {selected &&
-                        (isCorrect ? (
-                          <CheckCircle className="w-5 h-5 text-emerald-300" />
-                        ) : isWrong ? (
-                          <XCircle className="w-5 h-5 text-rose-300" />
-                        ) : null)}
-                    </button>
+                      {isSelected && (
+                        <motion.span
+                          initial={{ scale: 0 }}
+                          animate={{ scale: 1 }}
+                          transition={{ type: "spring" }}
+                        >
+                          {isCorrect ? (
+                            <CheckCircle className="w-5 h-5 text-white" />
+                          ) : (
+                            <XCircle className="w-5 h-5 text-white" />
+                          )}
+                        </motion.span>
+                      )}
+                    </motion.button>
                   );
                 })}
               </div>
-              <div className="mt-6 text-sm text-slate-400 text-right">
-                Question <span className="font-medium">{current + 1}</span> of{" "}
-                {questions.length}
-              </div>
-            </motion.div>
+            </motion.section>
           </AnimatePresence>
         )}
 
         {/* Score screen */}
         {showScore && (
-          <motion.div
+          <motion.section
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.4 }}
-            className="text-center py-10"
+            transition={{ type: "spring", stiffness: 300 }}
+            className="text-center py-8"
           >
-            <h2 className="text-3xl font-semibold mb-4 text-violet-200">
-              🎉 Quiz Completed
-            </h2>
-            <p className="mb-6 text-lg text-slate-200">
-              You got <span className="text-cyan-300 font-bold">{score}</span>{" "}
-              out of{" "}
-              <span className="text-slate-100 font-bold">
-                {questions.length}
-              </span>
-            </p>
-            <button
-              onClick={restartQuiz}
-              className="bg-indigo-500 hover:bg-indigo-600 hover:ring-2 hover:ring-indigo-300 transition-all duration-200 px-6 py-3 rounded-lg font-medium text-white text-lg"
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ delay: 0.2 }}
+              className="flex justify-center mb-6"
             >
-              Try Another Topic
-            </button>
-          </motion.div>
+              <div className="w-20 h-20 rounded-full bg-gradient-to-br from-yellow-500 to-amber-600 flex items-center justify-center shadow-lg">
+                <Trophy className="w-8 h-8 text-white" />
+              </div>
+            </motion.div>
+
+            <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-yellow-500 mb-2">
+              Quiz Completed!
+            </h2>
+            <p className="text-lg text-gray-300 mb-6">
+              You scored{" "}
+              <span className="text-2xl font-bold text-white">{score}</span> out
+              of <span className="text-white">{questions.length}</span>
+            </p>
+
+            <div className="w-full bg-gray-700/50 h-3 rounded-full overflow-hidden mb-8">
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: `${(score / questions.length) * 100}%` }}
+                transition={{ duration: 1, delay: 0.4 }}
+                className={`h-full ${
+                  score / questions.length > 0.7
+                    ? "bg-green-500"
+                    : score / questions.length > 0.4
+                    ? "bg-yellow-500"
+                    : "bg-red-500"
+                }`}
+              />
+            </div>
+
+            <motion.button
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+              onClick={restartQuiz}
+              className="w-full max-w-xs mx-auto bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-semibold rounded-xl px-6 py-3.5 text-lg shadow-lg transition-all"
+            >
+              Start New Quiz
+            </motion.button>
+          </motion.section>
         )}
+        </motion.div>
       </div>
     </div>
   );
