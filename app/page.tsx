@@ -1,7 +1,9 @@
+import Quiz from "./components/Quiz";
+
 export default function Home() {
   return (
     <div>
-      <h1>Hello</h1>
+      <Quiz/>
     </div>
   );
 }
