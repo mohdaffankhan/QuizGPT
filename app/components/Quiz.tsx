@@ -1,20 +1,17 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import {
-  CheckCircle,
-  XCircle,
-  Trophy,
-  ArrowRight,
-} from "lucide-react";
+import { CheckCircle, XCircle, Trophy, ArrowRight } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
-import { SignedIn, SignedOut, SignInButton, SignUpButton, UserButton, useUser } from "@clerk/nextjs";
+import { signIn, signOut, useSession } from "next-auth/react";
 import Image from "next/image";
 
 type Question = { question: string; choices: string[]; answer: string };
 
 export default function Quiz() {
-  const { isSignedIn } = useUser();
+  const { data: session } = useSession();
+  const isSignedIn = !!session?.user;
+
   const [score, setScore] = useState(0);
   const [current, setCurrent] = useState(0);
   const [start, setStart] = useState(false);
@@ -25,10 +22,7 @@ export default function Quiz() {
   const [loading, setLoading] = useState(false);
   const [level, setLevel] = useState(3);
 
-  const hasUsedFree = useCallback(
-    () => localStorage.getItem("freeUsed") === "true",
-    []
-  );
+  const hasUsedFree = useCallback(() => localStorage.getItem("freeUsed") === "true", []);
 
   const startQuiz = useCallback(async () => {
     if (!topic.trim()) return;
@@ -88,7 +82,7 @@ export default function Quiz() {
         } else {
           setShowScore(true);
         }
-      }, 800); // Slightly longer delay for smoother transition
+      }, 800);
     },
     [questions, current, selected]
   );
@@ -97,35 +91,43 @@ export default function Quiz() {
 
   return (
     <div>
-      {/* Auth buttons in top right corner */}
+      {/* Top-right auth buttons */}
       <div className="absolute top-4 right-4 z-50">
-        <SignedOut>
+        {!isSignedIn ? (
           <div className="flex items-center gap-3">
-            <SignInButton>
-              <button className="text-gray-300 hover:text-white font-medium rounded-lg px-4 py-2 transition hover:bg-gray-800">
-                Sign In
-              </button>
-            </SignInButton>
-            <SignUpButton>
-              <button className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium text-sm sm:text-base h-10 px-5 cursor-pointer transition shadow-lg hover:shadow-indigo-500/20">
-                Get Started
-              </button>
-            </SignUpButton>
+            <button
+              onClick={() => signIn()}
+              className="text-gray-300 hover:text-white font-medium rounded-lg px-4 py-2 transition hover:bg-gray-800"
+            >
+              Sign In
+            </button>
+            <button
+              onClick={() => signIn()}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium text-sm sm:text-base h-10 px-5 cursor-pointer transition shadow-lg hover:shadow-indigo-500/20"
+            >
+              Get Started
+            </button>
           </div>
-        </SignedOut>
-        <SignedIn>
-          <UserButton appearance={{
-            elements: {
-              userButtonAvatarBox: "w-9 h-9",
-              userButtonPopoverCard: "bg-gray-800 border-gray-700",
-              userButtonPopoverActionButtonText: "text-gray-200",
-              userButtonPopoverActionButton: "hover:bg-gray-700",
-              userButtonPopoverFooter: "bg-gray-800"
-            }
-          }} />
-        </SignedIn>
+        ) : (
+          <div className="flex items-center gap-3">
+            <Image
+              src={session.user?.image || "/placeholder-avatar.png"}
+              alt="User Avatar"
+              width={36}
+              height={36}
+              className="rounded-full border border-gray-600"
+            />
+            <button
+              onClick={() => signOut()}
+              className="text-sm text-gray-300 hover:text-white border border-gray-600 rounded-lg px-3 py-1.5 transition hover:bg-gray-700"
+            >
+              Sign Out
+            </button>
+          </div>
+        )}
       </div>
 
+      {/* Quiz UI below */}
       <div className="flex flex-col items-center justify-center w-full px-4 py-10">
         <motion.div
           initial={{ scale: 0.96, opacity: 0 }}
