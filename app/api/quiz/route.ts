@@ -1,14 +1,19 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { auth } from "@clerk/nextjs/server";
+import { authOptions } from "@/app/api/auth/[...nextauth]/options";
+import { getServerSession } from "next-auth";
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
 export async function POST(req: Request) {
   try {
-    const { userId } = await auth();
+    const session = await getServerSession(authOptions);
     const freeUsed = req.headers.get("x-free-used");
+    const userId = session?.user?.id || null;
+
     if (!userId && freeUsed === "true") {
       return new Response(
-        "You've used your free quiz. Sign in to generate more."
+        "You've used your free quiz. Sign in to generate more.",
+        { status: 403 }
       );
     }
 
