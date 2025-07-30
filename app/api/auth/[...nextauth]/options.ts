@@ -18,6 +18,8 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async signIn({ user }) {
       try {
+        console.log("Attempting sign-in for:", user.email);
+
         const existingUser = await prisma.user.findUnique({
           where: { email: user.email! },
         });
@@ -31,12 +33,11 @@ export const authOptions: NextAuthOptions = {
             },
           });
         }
+
         return true;
       } catch (error) {
-        console.error("Error during sign-in:", error);
+        console.error("Error during sign-in:", (error as Error).message);
         return false;
-      } finally {
-        await prisma.$disconnect();
       }
     },
   },
