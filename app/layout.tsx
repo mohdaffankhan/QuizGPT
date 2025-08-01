@@ -27,14 +27,7 @@ export default function RootLayout({
         <body
           className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gray-50 text-gray-900 min-h-screen flex flex-col`}
         >
-          <main className="flex-grow max-w-4xl mx-auto w-full px-4 sm:px-6 md:px-8 py-10">
-            {children}
-          </main>
-          <footer className="bg-gray-900 text-gray-400 py-6 mt-auto">
-            <div className="max-w-4xl mx-auto px-4 sm:px-6 md:px-8 text-center text-sm">
-              © {new Date().getFullYear()} QuizGPT. All rights reserved.
-            </div>
-          </footer>
+          <main>{children}</main>
         </body>
       </html>
     </Providers>

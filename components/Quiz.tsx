@@ -3,7 +3,7 @@
 import { useState, useCallback } from "react";
 import { CheckCircle, XCircle, Trophy, ArrowRight } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
-import { signIn, signOut, useSession } from "next-auth/react";
+import { useSession } from "next-auth/react";
 import Image from "next/image";
 
 type Question = { question: string; choices: string[]; answer: string };
@@ -91,41 +91,6 @@ export default function Quiz() {
 
   return (
     <div>
-      {/* Top-right auth buttons */}
-      <div className="absolute top-4 right-4 z-50">
-        {!isSignedIn ? (
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => signIn()}
-              className="text-gray-300 hover:text-white font-medium rounded-lg px-4 py-2 transition hover:bg-gray-800"
-            >
-              Sign In
-            </button>
-            <button
-              onClick={() => signIn()}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium text-sm sm:text-base h-10 px-5 cursor-pointer transition shadow-lg hover:shadow-indigo-500/20"
-            >
-              Get Started
-            </button>
-          </div>
-        ) : (
-          <div className="flex items-center gap-3">
-            <Image
-              src={session.user?.image || "/placeholder-avatar.png"}
-              alt="User Avatar"
-              width={36}
-              height={36}
-              className="rounded-full border border-gray-600"
-            />
-            <button
-              onClick={() => signOut()}
-              className="text-sm text-gray-300 hover:text-white border border-gray-600 rounded-lg px-3 py-1.5 transition hover:bg-gray-700"
-            >
-              Sign Out
-            </button>
-          </div>
-        )}
-      </div>
 
       {/* Quiz UI below */}
       <div className="flex flex-col items-center justify-center w-full px-4 py-10">
