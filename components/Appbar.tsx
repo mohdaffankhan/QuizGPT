@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Profile from "./Profile";
+import { ThemeToggleButton } from "./ThemeToggleButton";
 
 export default function Appbar() {
     return (
@@ -12,6 +13,7 @@ export default function Appbar() {
                 </h1>
 
                 <div className="flex items-center gap-4">
+                    <ThemeToggleButton />
                     <Profile />
                 </div>
             </nav>

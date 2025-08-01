@@ -22,14 +22,12 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <Providers>
-      <html lang="en" className="scroll-smooth">
-        <body
-          className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gray-50 text-gray-900 min-h-screen flex flex-col`}
-        >
-          <main>{children}</main>
-        </body>
-      </html>
-    </Providers>
+    <html lang="en" suppressHydrationWarning>
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} antialiased h-screen dark:bg-black bg-white`}
+      >
+        <Providers>{children}</Providers>
+      </body>
+    </html>
   );
 }
